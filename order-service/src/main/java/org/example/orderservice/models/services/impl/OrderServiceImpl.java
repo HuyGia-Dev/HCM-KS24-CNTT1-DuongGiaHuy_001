@@ -31,20 +31,17 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
-        // 1. Fetch all products to validate existence and get latest prices
         List<ProductResponse> products = new ArrayList<>();
         for (CreateOrderDetailRequest item : request.items()) {
             ProductResponse product = productGatewayService.getProductById(item.productId());
             products.add(product);
         }
 
-        // 2. Calculate total = sum of (unitPrice * quantity) for each line
         double total = 0.0;
         for (int i = 0; i < request.items().size(); i++) {
             total += products.get(i).price() * request.items().get(i).quantity();
         }
 
-        // 3. Create and save Order with status PENDING
         Order order = Order.builder()
                 .customerName(request.customerName())
                 .total(total)
@@ -52,7 +49,6 @@ public class OrderServiceImpl implements OrderService {
                 .build();
         order = orderRepository.save(order);
 
-        // 4. Create and save OrderDetails, build response list
         List<OrderDetailResponse> orderDetailResponses = new ArrayList<>();
         for (int i = 0; i < request.items().size(); i++) {
             CreateOrderDetailRequest item = request.items().get(i);
@@ -77,7 +73,6 @@ public class OrderServiceImpl implements OrderService {
             ));
         }
 
-        // 5. Send Kafka event after successful order creation
         kafkaTemplate.send("order-created", request.customerEmail());
 
         return new OrderResponse(
